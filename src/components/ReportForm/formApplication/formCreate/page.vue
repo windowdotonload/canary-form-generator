@@ -1,0 +1,12 @@
+<template>
+  <FormCreate />
+</template>
+
+<script>
+import FormCreate from "./index.vue";
+export default {
+  components: {
+    FormCreate,
+  },
+};
+</script>
