@@ -1,7 +1,14 @@
-<script></script>
+<script>
+import PAGE from "./components/ReportForm/formApplication/formCreate/page.vue";
+export default {
+  components: {
+    PAGE,
+  },
+};
+</script>
 
 <template>
-  <div>111111</div>
+  <PAGE />
 </template>
 
 <style scoped></style>

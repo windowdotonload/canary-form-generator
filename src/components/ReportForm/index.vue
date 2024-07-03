@@ -1,10 +1,28 @@
 <template>
   <div class="custome-table__container">
-    <el-button size="small" style="margin-bottom: 10px" @click="resetForm">重置筛选</el-button>
-    <el-button size="small" style="float: right" type="danger" @click="createReportForm">新建</el-button>
-    <CustomTabale tableHeight="70vh" :tableHeader="tableDataHeader" :tableData="customTableData" @changeSearch="tableInputSearch">
+    <el-button size="small" style="margin-bottom: 10px" @click="resetForm"
+      >重置筛选</el-button
+    >
+    <el-button
+      size="small"
+      style="float: right"
+      type="danger"
+      @click="createReportForm"
+      >新建</el-button
+    >
+    <CustomTabale
+      tableHeight="70vh"
+      :tableHeader="tableDataHeader"
+      :tableData="customTableData"
+      @changeSearch="tableInputSearch"
+    >
       <template v-slot:woFormType="slotProps">
-        <el-table-column :resizable="false" label="报告类型" width="200" show-overflow-tooltip>
+        <el-table-column
+          :resizable="false"
+          label="报告类型"
+          width="200"
+          show-overflow-tooltip
+        >
           <template slot="header">
             <column-header
               title="报告类型"
@@ -22,7 +40,12 @@
         </el-table-column>
       </template>
       <template v-slot:status="slotProps">
-        <el-table-column :resizable="false" label="状态" width="200" show-overflow-tooltip>
+        <el-table-column
+          :resizable="false"
+          label="状态"
+          width="200"
+          show-overflow-tooltip
+        >
           <template slot="header">
             <column-header
               title="状态"
@@ -39,10 +62,30 @@
           </template>
         </el-table-column>
       </template>
-      <el-table-column :resizable="false" slot="operation" fixed="right" label="操作" align="center" width="200">
+      <el-table-column
+        :resizable="false"
+        slot="operation"
+        fixed="right"
+        label="操作"
+        align="center"
+        width="200"
+      >
         <template slot-scope="scope">
-          <el-button type="text" size="mini" style="color: #001450" @click="editReportForm(scope.row)">编辑</el-button>
-          <el-button :disabled="scope.row.status == 1" type="text" size="mini" style="color: #d10000" @click="deleteReportForm(scope.row)">删除</el-button>
+          <el-button
+            type="text"
+            size="mini"
+            style="color: #001450"
+            @click="editReportForm(scope.row)"
+            >编辑</el-button
+          >
+          <el-button
+            :disabled="scope.row.status == 1"
+            type="text"
+            size="mini"
+            style="color: #d10000"
+            @click="deleteReportForm(scope.row)"
+            >删除</el-button
+          >
         </template>
       </el-table-column>
     </CustomTabale>
@@ -63,7 +106,7 @@
 import customTable from "../tableComponents/customTable";
 import columnHeader from "../tableComponents/headerComponent";
 import TableConfigMixin from "./config/customTable.data";
-import { updateForm } from "./formApplication/api/api.js";
+// import { updateForm } from "./formApplication/api/api.js";
 export default {
   mixins: [TableConfigMixin],
   components: {
@@ -118,15 +161,18 @@ export default {
     };
   },
   created() {
-    this.getFormList();
-    this.getWoFormTypeList();
+    // this.getFormList();
+    // this.getWoFormTypeList();
   },
   methods: {
     async getWoFormTypeList() {
-      const res = await this.requestMethodGetTip("wo/formConfig/getWoFormType", {
-        current: 1,
-        size: 30,
-      });
+      const res = await this.requestMethodGetTip(
+        "wo/formConfig/getWoFormType",
+        {
+          current: 1,
+          size: 30,
+        }
+      );
       if (res.data.code == 1000) {
         this.woFormTypeList = res.data.data.list;
         this.tableDataHeader[0].selectOptions = res.data.data.list;
@@ -186,7 +232,10 @@ export default {
         size: this.pagenation.size,
       };
       Object.keys(this.searchParams).forEach((key) => {
-        if (this.searchParams[key] && !["createTime", "updateTime"].includes(key)) {
+        if (
+          this.searchParams[key] &&
+          !["createTime", "updateTime"].includes(key)
+        ) {
           params[key] = this.searchParams[key];
         }
         if (this.searchParams.createName) {
@@ -196,7 +245,10 @@ export default {
           params.updateUser = this.searchParams.updateName;
         }
       });
-      const res = await this.requestMethodGetTip("/wo/form/getFormList", params);
+      const res = await this.requestMethodGetTip(
+        "/wo/form/getFormList",
+        params
+      );
       if (res.data.code == 1000) {
         this.customTableData = res.data.data.list;
         this.totalNumber = res.data.data.totalCount;
@@ -227,9 +279,12 @@ export default {
         this.searchParams[e.paramValue + "End"] = e.changeValue[1];
       }
       if (e.paramValue == "status") {
-        this.searchParams[e.paramValue] = e.changeValue.toString && e.changeValue.toString();
+        this.searchParams[e.paramValue] =
+          e.changeValue.toString && e.changeValue.toString();
       }
-      const searchHeader = this.tableDataHeader.find((item) => item.paramValue == e.paramValue);
+      const searchHeader = this.tableDataHeader.find(
+        (item) => item.paramValue == e.paramValue
+      );
       if (searchHeader) {
         searchHeader.changeValue = e.changeValue;
       }
