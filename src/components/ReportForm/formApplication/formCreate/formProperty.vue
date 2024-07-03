@@ -28,6 +28,7 @@ export default {
   inject: ["editFormData"],
   created() {
     this.getWoFormType();
+    this.revertFormInfo();
   },
   data() {
     return {
@@ -38,12 +39,19 @@ export default {
       form: {
         woFormType: this.$route.query.woFormType || "",
         remark: this.$route.query.remark || "",
-        status: this.$route.query.status || 1,
+        status: "status" in this.$route.query ? this.$route.query.status : 1,
       },
       reportFormTypeList: [],
     };
   },
   methods: {
+    revertFormInfo() {
+      this.form = {
+        woFormType: this.$route.query.woFormType || "",
+        remark: this.$route.query.remark || "",
+        status: "status" in this.$route.query ? parseInt(this.$route.query.status) : 1,
+      };
+    },
     async getWoFormType() {
       this.initWoFormTypeDisabled();
       const params = {

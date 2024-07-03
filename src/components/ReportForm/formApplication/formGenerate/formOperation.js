@@ -1,6 +1,5 @@
 import Fields from "./components/material";
 import { generateUniqueUUID } from "../formGenerate/components/uitls/index";
-import { cloneDeep, get } from "lodash";
 import { EVENTBUS } from "../formGenerate/components/uitls/EVENTBUS.js";
 import { deleteFormComponent } from "../api/api.js";
 
@@ -32,7 +31,7 @@ const wrapComponentStyle = {
   fieldItemContainerActive(parentId = null, componentType) {
     const baseStyle = { position: "absolute", top: "0", left: "-50px", height: "100%", width: "3px", background: "#d10000" };
     if (parentId) {
-      baseStyle.left = "-18px";
+      baseStyle.left = "-10px";
     }
     if (parentId && componentType === 11) {
       baseStyle.left = "0";
@@ -46,6 +45,25 @@ const activeFieldProperty = reactive({ value: null });
 const activeFieldHover = ref(null);
 const setActiveFieldProperty = (fieldInfo) => {
   activeFieldProperty.value = fieldInfo;
+};
+
+export const findComponentWithUUID = (uuid) => {
+  let res = null;
+  const findComponent = (list) => {
+    list.some((item) => {
+      let baseObj = item;
+      if (item.tabComponentModule) baseObj = item.tabComponentModule;
+      if (baseObj.__uuid === uuid) {
+        res = baseObj;
+        return true;
+      }
+      if (baseObj._uFieldInfo && baseObj._uFieldInfo._configField.children) {
+        return findComponent(baseObj._uFieldInfo._configField.children);
+      }
+    });
+  };
+  findComponent(formOperationState.formContentList);
+  return res;
 };
 
 export const formOperationState = reactive({
@@ -64,17 +82,108 @@ export const changeActiveField = (fieldInfo) => {
   setActiveFieldProperty(fieldInfo);
 };
 
-export const findComponentForDisplayRule = ([moduleId, fieldId], display = true) => {
+export const findComponentForDisplayRule = ([moduleId, fieldId], display = true, indexOfButtonGroup, uuidOfButtonForBG) => {
   const module = formOperationState.formContentList.find((item) => item.__uuid === moduleId);
   if (!module) return;
-  const field = module._uFieldInfo._configField.children.find((item) => item.__uuid === fieldId);
+  let field = null;
+  const findTarget = (list) => {
+    list.some((item) => {
+      const baseObj = item.tabComponentModule ? item.tabComponentModule : item;
+      if (baseObj.__uuid === fieldId) {
+        field = baseObj;
+        return true;
+      }
+      let children = baseObj._uFieldInfo && baseObj._uFieldInfo._configField.children;
+
+      if (baseObj._uFieldInfo && baseObj._uFieldInfo._configField.__group) {
+        if (indexOfButtonGroup >= 0 && uuidOfButtonForBG) {
+          /** 判断此字段是在按钮组中 ，分发到按钮组件中的事件进行后续显隐控制 */
+          const childInBG = baseObj._uFieldInfo._configField.__group[indexOfButtonGroup].find((item) => item.__uuid == fieldId);
+          if (childInBG) {
+            EVENTBUS.$emit(uuidOfButtonForBG, { configProperty: "FILLFORMDISPLAY", value: { display, uuid: fieldId, indexOfButtonGroup } });
+            return true;
+          }
+        }
+      }
+      if (children && children.length) {
+        return findTarget(children);
+      }
+    });
+  };
+  findTarget(module._uFieldInfo._configField.children);
   if (!field) return;
-  EVENTBUS.$emit(field.__uuid, { configProperty: "FILLFORMDISPLAY", value: display });
+  EVENTBUS.$emit(field.__uuid, { configProperty: "FILLFORMDISPLAY", value: { display, uuid: field.__uuid } });
   return field;
 };
 
+export const traceBucket = {};
+export const triggerBucket = {};
+
+export const handleDisplayBucket = (list) => {
+  const includeDisplayRuleComponentType = [3, 4];
+  const dfs = (list) => {
+    if (!list || !list.length) return;
+    list.forEach((item) => {
+      const configField = item.configField;
+      if (!includeDisplayRuleComponentType.includes(configField.componentType)) return dfs(configField.children);
+      if (!configField) return;
+      if (!configField.displayRule) return dfs(configField.children);
+      const rule = JSON.parse(configField.displayRule);
+      if (!rule.displayControl) return dfs(configField.children);
+      const displayControl = rule.displayControl;
+      if (!displayControl.length) return dfs(configField.children);
+
+      const controllerUuid = configField.woComponentUuid;
+      triggerBucket[controllerUuid] = [];
+      displayControl.forEach((item) => {
+        const [hitValueObj, displayUuidArray] = item;
+        const curHitValue = hitValueObj.value;
+        displayUuidArray.value.forEach((uuids /** array */) => {
+          const [moduleId, fieldId] = uuids;
+          const temp = traceBucket[fieldId];
+          if (!temp) {
+            traceBucket[fieldId] = [];
+            traceBucket[fieldId].push({
+              DependencyUuid: controllerUuid,
+              hitValue: [curHitValue],
+            });
+          } else {
+            const item = temp.find((item) => item.DependencyUuid === controllerUuid);
+            if (item) {
+              const exist = item.hitValue.includes(curHitValue);
+              if (!exist) item.hitValue.push(curHitValue);
+            } else {
+              temp.push({
+                DependencyUuid: controllerUuid,
+                hitValue: [curHitValue],
+              });
+            }
+          }
+        });
+      });
+      if (configField.children && configField.children.length) {
+        dfs(configField.children);
+      }
+    });
+  };
+  dfs(list);
+};
+
+export const hydrateTriggerBucket = (fieldInstance) => {
+  const configField = fieldInstance.__configField;
+  const fieldUuid = configField.woComponentUuid;
+  if (traceBucket[fieldUuid]) {
+    traceBucket[fieldUuid].forEach((i) => {
+      const { DependencyUuid, hitValue } = i;
+      const __func = fieldInstance.handleFillFormDisplayCrawler;
+      if (!__func) return;
+      triggerBucket[DependencyUuid].push(__func.bind(fieldInstance, DependencyUuid, hitValue));
+    });
+  }
+};
+
 const createFormField = (fieldInfo, returnOnly) => {
-  const __fieldInfo = Object.create(cloneDeep(fieldInfo));
+  const __fieldInfo = Object.create(fieldInfo);
   const backendWoComponentUuid = fieldInfo.configField && fieldInfo.configField.woComponentUuid;
   const curUUUID = backendWoComponentUuid ? backendWoComponentUuid : generateUniqueUUID(10);
   __fieldInfo.__uuid = curUUUID;
@@ -160,6 +269,10 @@ export const OperationGroup = Vue.extend({
       type: Object,
       default: () => ({}),
     },
+  },
+  beforeDestroy() {
+    this.fieldInfo = null;
+    this.parent = null;
   },
   methods: {
     moveUp(e) {
@@ -248,6 +361,10 @@ export const OperationGroup = Vue.extend({
 
 export const HocComponentCotr = Vue.extend({
   props: {
+    _uFieldInfo: {
+      type: Object,
+      default: null,
+    },
     disabledEditForm: {
       type: Boolean,
       default: false,
@@ -260,9 +377,13 @@ export const HocComponentCotr = Vue.extend({
       type: Function,
       default: () => {},
     },
-    _uFieldInfo: {
-      type: Object,
-      default: null,
+    indexOfButtonGroup: {
+      type: Number,
+      default: -1,
+    },
+    uuidOfButtonForBG: {
+      type: String,
+      default: "",
     },
   },
   provide() {
@@ -275,7 +396,7 @@ export const HocComponentCotr = Vue.extend({
       info: null,
       fieldInfo: this._uFieldInfo,
       fieldRules: [],
-      fieldItemContainerStyle: cloneDeep(wrapComponentStyle.fieldItemContainer),
+      fieldItemContainerStyle: JSON.parse(JSON.stringify(wrapComponentStyle.fieldItemContainer)),
       Component: null,
     };
   },
@@ -285,6 +406,13 @@ export const HocComponentCotr = Vue.extend({
     this.handleRequiredRule();
   },
   methods: {
+    clearState() {
+      this.info = null;
+      this.fieldInfo = null;
+      this.fieldRules = null;
+      this.fieldItemContainerStyle = null;
+      this.Component = null;
+    },
     initUFieldInfo() {
       if (!this._uFieldInfo) return;
       this.fieldInfo = this._uFieldInfo;
@@ -342,7 +470,6 @@ export const HocComponentCotr = Vue.extend({
     },
     focusField(e) {
       e.stopPropagation();
-      const checkFieldNameFill = formOperationState.activeField && !formOperationState.activeField._configField.fieldName;
       if (formOperationState.activeField && !formOperationState.activeField._configField.fieldName)
         return ELEMENT.Message({
           type: "warning",
@@ -355,12 +482,13 @@ export const HocComponentCotr = Vue.extend({
       // nop
     },
     configField(configFieldInfo) {
-      const cloneDeepConfigFieldInfo = cloneDeep(configFieldInfo);
+      const cloneDeepConfigFieldInfo = configFieldInfo;
       const { configProperty, value } = cloneDeepConfigFieldInfo;
       if (configProperty === "FILLFORMDISPLAY") {
         const compIns = this.$refs[this.fieldInfo.__uuid];
         if (compIns && compIns.handleFillFormDisplay) {
-          compIns.handleFillFormDisplay(value);
+          const { display, uuid, indexOfButtonGroup } = value;
+          compIns.handleFillFormDisplay(display, uuid, indexOfButtonGroup);
         }
         return;
       }
@@ -400,18 +528,22 @@ export const HocComponentCotr = Vue.extend({
         <Component
           __CtorUUID={this.fieldInfo.__uuid}
           __configField={this.fieldInfo._configField}
+          __hydrateTriggerBucket={hydrateTriggerBucket}
           ref={this.fieldInfo.__uuid}
+          indexOfButtonGroup={this.indexOfButtonGroup}
+          uuidOfButtonForBG={this.uuidOfButtonForBG}
           disabled={!this.disabledEditForm || this.disabledField}
           disabledEditForm={this.disabledEditForm}
           children={this.fieldInfo._configField.children}
-          maxlength={this.fieldInfo._configField.length}
+          limit={this.fieldInfo._configField.lengthMax}
+          maxlength={this.fieldInfo._configField.lengthMax}
           fieldName={this.fieldInfo._configField.fieldName}
           fieldRules={this.fieldInfo._configField.requireFlag ? [{ required: true, message: `请输入`, trigger: "blur" }] : []}
           defaultValue={this.fieldInfo._configField.defaultValue}
+          placeholder={this.fieldInfo._configField.placeHolder}
           options={this.fieldInfo._configField.options}
           radioOptions={this.fieldInfo._configField.options}
           checkBoxOptions={this.fieldInfo._configField.options}
-          limit={this.fieldInfo._configField.limit}
           textStyle={this.fieldInfo._configField.textStyle}
           textContent={this.fieldInfo._configField.textContent}
           fieldList={this.fieldInfo._configField.fieldList}

@@ -50,9 +50,9 @@ export const SelectOptions = Vue._$extend(
         this.$emit("getOptions", this.optionsType == 1 ? this.formModel.selectOptions : { opType: "setVal", selectOptions: this.formModel.selectOptions });
       },
       addOption() {
-        if (this.formModel.selectOptions.length >= 100) {
+        if (this.formModel.selectOptions.length >= this.maxOptionCount) {
           return ELEMENT.Message({
-            message: "最多添加10条选项",
+            message: `最多添加${this.maxOptionCount}条选项`,
             type: "warning",
           });
         }
@@ -108,6 +108,7 @@ export const SelectOptions = Vue._$extend(
           componentType: e,
           value: e,
           key: item.key,
+          prevSelectCompItem: { ...item },
         };
         this.formModel.selectOptions.splice(index, 1, changeTypeInfo);
         this.$emit("getOptions", this.optionsType == 1 ? this.formModel.selectOptions : { opType: "change", opItem: changeTypeInfo, selectOptions: this.formModel.selectOptions });
@@ -118,7 +119,7 @@ export const SelectOptions = Vue._$extend(
         <el-form model={this.formModel} label-position="top">
           <el-form-item rules={this.fieldRules} style={{ marginBottom: "8px" }}>
             <label v-slot="label">{this.fieldName}</label>
-            <span style={{ color: "#999", fontSize: "13px" }}>（上限：10项）</span>
+            <span style={{ color: "#999", fontSize: "13px" }}>（上限：{this.maxOptionCount}项）</span>
           </el-form-item>
           <transition-group name="animation-list">
             {this.formModel.selectOptions.map((item, index) => {
@@ -175,6 +176,10 @@ export const SelectOptions = Vue._$extend(
           { value: "选项1", key: generateUniqueUUID() },
           { value: "选项2", key: generateUniqueUUID() },
         ],
+      },
+      maxOptionCount: {
+        type: Number,
+        default: 100,
       },
       optionsType: {
         type: Number,

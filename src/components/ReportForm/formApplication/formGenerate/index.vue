@@ -20,7 +20,6 @@ import { menuData } from "./components/iconMenu/config.js";
 import IconMenu from "./components/iconMenu/index.vue";
 import FormContent from "./components/formContent/index.vue";
 import PropertyPanel from "./components/propertyPanel/index.vue";
-import { cloneDeep } from "lodash";
 
 export default {
   components: {
@@ -40,7 +39,7 @@ export default {
     findBaseCompInfo(componentType) {
       const baseCompInfo = menuData[0].subMenuData.find((item) => item.componentType === componentType);
       if (baseCompInfo) {
-        return cloneDeep(baseCompInfo);
+        return JSON.parse(JSON.stringify(baseCompInfo));
       }
       return null;
     },
@@ -49,7 +48,7 @@ export default {
       if (!compInfoList.length) return;
       return compInfoList.map((compInfo) => {
         const configInfo = this.findBaseCompInfo(compInfo.woComponentType);
-        const baseCompInfo = configInfo ? configInfo : cloneDeep(compInfo);
+        const baseCompInfo = configInfo ? configInfo : JSON.parse(JSON.stringify(compInfo));
         baseCompInfo.fieldName = compInfo.woComponentName;
         baseCompInfo.configField = compInfo;
         baseCompInfo.configField.options = compInfo.options ? JSON.parse(compInfo.options) : baseCompInfo.options;

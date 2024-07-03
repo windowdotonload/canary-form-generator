@@ -3,7 +3,6 @@ import { getFullUrl, getGuideList, getGuideDetail } from "../../../api/api";
 import PropertyFields from "../material";
 import "../../index.css";
 import { css, cx } from "@emotion/css";
-import { inject, provide } from "vue";
 
 const normalStyle = css`
   font-size: 14px;
@@ -60,7 +59,7 @@ const GuideReaction = {
             :visible.sync="dialogVisible"
             width="20%"
             @close="handleClose">
-            <prev style='white-space:pre'>${guideInfo.url}</prev>
+            <prev style='white-space:pre-wrap'>${guideInfo.url}</prev>
           </el-dialog>
         `,
       }).$mount();
@@ -166,6 +165,11 @@ export const GuideLubricationServiceTip = Vue.extend({
       default: "",
     },
   },
+  watch: {
+    tipOption() {
+      this.findTipInfo();
+    },
+  },
   data() {
     return {
       guideList: [],
@@ -223,6 +227,7 @@ export const GuideLubricationService = Vue.extend({
               flex-wrap: wrap;
               color: #001450;
               align-items: center;
+              margin-bottom: 15px;
             `}
           >
             {this.$attrs.nest ? (
@@ -239,7 +244,20 @@ export const GuideLubricationService = Vue.extend({
             ) : (
               <i class="el-icon-question" style="margin-right:3px;color:#666" />
             )}
-            {this.guideInfo.name} <i class="el-icon-arrow-right" style="margin-left:5px" />
+            <el-tooltip content={this.guideInfo.name} placement="top">
+              <div
+                class={css`
+                  display: inline-block;
+                  max-width: 88%;
+                  white-space: nowrap;
+                  text-overflow: ellipsis;
+                  overflow: hidden;
+                `}
+              >
+                {this.guideInfo.name}
+              </div>
+            </el-tooltip>
+            {![4, 6].includes(this.guideInfo.type) && <i class="el-icon-arrow-right" style="margin-left:5px" />}
             {this.guideInfo.type == 4 && (
               <div
                 class={css`

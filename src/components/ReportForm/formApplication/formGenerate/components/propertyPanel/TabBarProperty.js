@@ -1,7 +1,6 @@
 import PropertyFields from "../material";
 import { EVENTBUS } from "../../formOperation.js";
 import { menuData } from "../iconMenu/config.js";
-import { cloneDeep } from "lodash";
 import { generateUniqueUUID } from "../uitls/index.js";
 export const configMixin = (rawOptions) => {
   return {
@@ -26,8 +25,6 @@ Vue.extendWithMixin = (rawOptions) => {
   const options = Object.assign({}, extendOptions, rawOptions);
   return Vue.extend(options);
 };
-;
-
 export const TabBarProperty = Vue.extendWithMixin({
   data() {
     return {
@@ -36,15 +33,14 @@ export const TabBarProperty = Vue.extendWithMixin({
     };
   },
   created() {
-    console.log("--activeField--Tabbarpropery", cloneDeep(this.activeField));
     const { _configField } = this.activeField;
     if (_configField.children && _configField.children.length) {
-      this.options = cloneDeep(_configField.children);
+      this.options = _configField.children;
     }
   },
   methods: {
     getTabList(e) {
-      this.changeFieldConfig("children", cloneDeep(e));
+      this.changeFieldConfig("children", e);
     },
   },
   render() {

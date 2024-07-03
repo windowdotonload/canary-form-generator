@@ -1,6 +1,5 @@
 import { resetOilCascadeMenu } from "@/components/formApplication/api/index.js";
 import { EVENTBUS } from "./EVENTBUS.js";
-import { cloneDeep } from "lodash";
 
 export const checkFieldItemInPropertyPanel = (vm) => {
   if (vm.$parent.$options._COMPONENTTYPE && vm.$parent.$options._COMPONENTTYPE === "PROPERTY" && vm.$parent.activeField) return true;
@@ -26,6 +25,7 @@ export const useCommonMixin = () => {
       this.$emit("initFieldInfo", this);
       this.initDefaultDisplay();
     },
+
     methods: {
       initDefaultDisplay() {
         if (!this.disabledEditForm) return (this.display = true);
@@ -79,11 +79,11 @@ export const useExtendConfig = (config = {}) => {
       },
       placeholder: {
         type: String,
-        default: "请输入",
+        default: "",
       },
       maxlength: {
         type: Number,
-        default: 15,
+        default: 30,
       },
       reverPropertyPanelValueKey: {
         type: String,
@@ -100,6 +100,14 @@ export const useExtendConfig = (config = {}) => {
       disabledEditForm: {
         type: Boolean,
         default: false,
+      },
+      indexOfButtonGroup: {
+        type: Number,
+        default: -1,
+      },
+      uuidOfButtonForBG: {
+        type: String,
+        default: "",
       },
       ...config,
     },
@@ -141,7 +149,7 @@ export const configMixin = (rawOptions) => {
       },
       revertPropertyPanel() {
         const { _configField } = this.activeField;
-        this.configField = cloneDeep(_configField);
+        this.configField = _configField;
       },
       changeTipInfo(e) {
         const { type, value } = e;

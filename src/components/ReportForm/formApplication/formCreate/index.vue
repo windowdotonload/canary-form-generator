@@ -10,7 +10,7 @@
       </div>
       <div>
         <el-button type="danger" size="mini" @click="save">保存</el-button>
-        <el-button type="danger" plain size="mini" @click="prevForm">预览</el-button>
+        <!-- <el-button type="danger" plain size="mini" @click="prevForm">预览</el-button> -->
         <el-button size="mini" @click="cancelCreate">取消</el-button>
       </div>
     </div>
@@ -29,7 +29,6 @@ import { createDialog } from "../formGenerate/components/uitls/index.js";
 import FormProperty from "./formProperty.vue";
 import FormGenerate from "../formGenerate/index";
 import { PreviewComponent, clearFormGenerateData, formOperationState } from "../formGenerate/formOperation.js";
-import { cloneDeep } from "lodash";
 
 export default {
   components: {
@@ -63,13 +62,12 @@ export default {
         type: "warning",
       })
         .then(() => {
-          // this.$router.replace({ name: "formTemplateList" });
+          this.$router.replace({
+            name: "ReportForm",
+          });
         })
         .catch(() => {
-          this.$message({
-            type: "info",
-            message: "已取消删除",
-          });
+          // nop
         });
     },
     prevForm() {
@@ -105,9 +103,9 @@ export default {
       const handleComponentItemInfo = (componentItemInfo) => {
         let compItemParams = {};
         if (componentItemInfo._uFieldInfo && componentItemInfo._uFieldInfo._configField) {
-          compItemParams = cloneDeep(componentItemInfo._uFieldInfo._configField);
+          compItemParams = JSON.parse(JSON.stringify(componentItemInfo._uFieldInfo._configField));
         } else {
-          compItemParams = cloneDeep(componentItemInfo);
+          compItemParams = JSON.parse(JSON.stringify(componentItemInfo));
         }
 
         if (compItemParams.options) {
@@ -145,14 +143,34 @@ export default {
       this.saveFormExec();
     },
     async saveFormExec() {
+      console.log("refreshFormGenerate", this.$route);
       await this.saveForm();
       await this.addFormComponent();
       this.refreshFormGenerate();
     },
     async refreshFormGenerate() {
       clearFormGenerateData();
-      await this.$nextTick();
-      this.$refs.FormGenerate.revertFormComponentList();
+      if (this.$route.name == "ReportFormCreate") {
+        const formPropertyParams = this.$refs.FormProperty.getFormMOdel();
+        let woFormInfo = {};
+        if (formPropertyParams) {
+          woFormInfo = {
+            ...formPropertyParams,
+          };
+        }
+
+        this.$router.push({
+          name: "ReportFormEdit",
+          query: {
+            ...woFormInfo,
+            woFormId: this.woFormId,
+          },
+        });
+        window.location.reload();
+      } else {
+        await this.$nextTick();
+        this.$refs.FormGenerate.revertFormComponentList();
+      }
     },
   },
   setup() {

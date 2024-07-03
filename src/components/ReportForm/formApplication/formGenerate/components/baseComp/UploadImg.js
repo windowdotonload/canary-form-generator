@@ -2,12 +2,17 @@ import { useCommonMixin, useExtendConfig, checkFieldItemInPropertyPanel, revertF
 import OSSUploadCombine from "@/generalComponents/OSSUpload/index.vue";
 import PropertyFields from "../material";
 import { GuideTipProperty, GuideNormalTip, GuideLubricationServiceTip } from "../systemComp/GuideTip";
+import ImgUploadCut from "../systemComp/uploadImg.vue";
+import { getFullUrl } from "../../../api/api.js";
 
 export const UploadImg = Vue._$extend(
   {
     mixins: [useCommonMixin()],
     data() {
       return {
+        cutHeight: 200,
+        cutWidth: 200,
+        setConfigStatus: false,
         formModel: {
           value: "",
           propFileList: [],
@@ -16,14 +21,42 @@ export const UploadImg = Vue._$extend(
     },
     created() {
       this.initDefaultVale();
+      this.initCutInfo();
     },
     methods: {
-      initDefaultVale() {
+      async initCutInfo() {
+        if (!this.disabledEditForm) return;
+        const displayRule = this.__configField.displayRule;
+        if (!displayRule) return;
+        const { height, width } = JSON.parse(displayRule);
+        this.cutHeight = height;
+        this.cutWidth = width;
+      },
+      async initDefaultVale() {
         if (!this.defaultValue) return;
-        this.formModel.propFileList = Array.isArray(this.defaultValue) ? this.defaultValue : this.defaultValue.split(",");
-        this.formModel.value = this.formModel.propFileList.join(",");
+        const fileHalfPathArray = Array.isArray(this.defaultValue) ? this.defaultValue : this.defaultValue.split(",");
+        const REQALL = Promise.all(
+          fileHalfPathArray.map(async (item) => {
+            const temp = {
+              halfPath: item,
+            };
+            const fullurl = await getFullUrl({
+              url: item,
+            });
+            temp.url = fullurl || "";
+            return temp;
+          })
+        );
+        this.formModel.propFileList = await REQALL;
+        this.formModel.value = this.formModel.propFileList.map((item) => item.halfPath).join(",");
       },
       setFile(e) {
+        /** needly field:
+         * {
+         *  halfPath: "https://oss.abc.com/xxx.jpg",
+         *  url: "https://oss.abc.com/xxx.jpg",
+         * }
+         * */
         this.formModel.propFileList = e;
         this.formModel.value = this.formModel.propFileList.map((item) => item.halfPath).join(",");
         this.$emit("changeValue", this.formModel.propFileList);
@@ -49,16 +82,20 @@ export const UploadImg = Vue._$extend(
                 {this.__configField.tipOption && <GuideLubricationServiceTip tipOption={this.__configField.tipOption} />}
               </span>
             )}
-            <OSSUploadCombine
-              disabled={this.disabled}
-              readOnly={this.readOnly}
-              limit={this.limit}
-              fileType="knowledge_library"
-              uploadType="image"
-              v-model="field"
-              propFileList={this.formModel.propFileList}
-              onChangeFileList={this.setFile}
-            />
+            {(!this.disabledEditForm || !this.__configField.displayRule) && (
+              <OSSUploadCombine
+                disabled={this.disabled}
+                readOnly={this.readOnly}
+                limit={this.limit}
+                fileType="work_order_picture"
+                uploadType="image"
+                propFileList={this.formModel.propFileList}
+                onChangeFileList={this.setFile}
+              />
+            )}
+            {this.disabledEditForm && !!this.__configField.displayRule && (
+              <ImgUploadCut limit={this.limit} cutWidth={parseInt(this.cutWidth)} cutHeight={parseInt(this.cutHeight)} propFileList={this.formModel.propFileList} onChangeFileList={this.setFile} />
+            )}
           </el-form-item>
         </el-form>
       );
@@ -77,11 +114,44 @@ export const UplaodImgFieldProperty = Vue.extendWithMixin({
   data() {
     return {
       cutShow: false,
+      cutHeight: "",
+      cutWidth: "",
     };
   },
+  created() {
+    this.revertCutInfo();
+  },
   methods: {
+    revertCutInfo() {
+      const { _configField } = this.activeField;
+      const displayRule = _configField.displayRule;
+      if (displayRule) {
+        const { height, width } = JSON.parse(displayRule);
+        this.cutHeight = height;
+        this.cutWidth = width;
+        this.cutShow = 1;
+      }
+    },
     changeCutControlShow(e) {
       this.cutShow = e;
+      if (!e) {
+        this.changeFieldConfig("displayRule", "");
+      }
+    },
+    chanegCutInfo(type, e) {
+      const { _configField } = this.activeField;
+      let displayRule = _configField.displayRule;
+      if (displayRule) {
+        displayRule = JSON.parse(displayRule);
+        displayRule[type] = e;
+        this.changeFieldConfig("renderFormat", `${displayRule.height || 0}:${displayRule.width || 0}`);
+        this.changeFieldConfig("displayRule", JSON.stringify(displayRule));
+        return;
+      }
+      const temp = {
+        [type]: e,
+      };
+      this.changeFieldConfig("displayRule", JSON.stringify(temp));
     },
   },
   render() {
@@ -92,13 +162,23 @@ export const UplaodImgFieldProperty = Vue.extendWithMixin({
           fieldRules={[{ required: true, message: "请输入字段名称", trigger: "blur" }]}
           onChangeValue={(e) => this.changeFieldConfig("fieldName", e)}
         />
-        <PropertyFields.Input fieldName="上传图片上限" />
+        <PropertyFields.Input fieldName="上传图片上限" defaultValue={this.configField.lengthMax} onChangeValue={(e) => this.changeFieldConfig("lengthMax", e)} />
         <PropertyFields.SwitchH defaultValue={this.configField.requireFlag} fieldName="是否必填" pText="是" nText="否" onChangeValue={(e) => this.changeFieldConfig("requireFlag", e)} />
         <PropertyFields.SwitchH defaultValue={this.cutShow} fieldName="图片是否需要裁剪" pText="是" nText="否" onChangeValue={this.changeCutControlShow} />
-        {this.cutShow && (
+        {this.cutShow != 0 && (
           <div>
-            <PropertyFields.Input fieldName="高度（像素）" fieldRules={[{ required: true, message: "请输入高度", trigger: "blur" }]} onChangeValue={(e) => this.changeFieldConfig("fieldName", e)} />
-            <PropertyFields.Input fieldName="宽度（像素）" fieldRules={[{ required: true, message: "请输入高度", trigger: "blur" }]} onChangeValue={(e) => this.changeFieldConfig("fieldName", e)} />
+            <PropertyFields.Input
+              fieldName="高度（像素）"
+              defaultValue={this.cutHeight}
+              fieldRules={[{ required: true, message: "请输入高度", trigger: "blur" }]}
+              onChangeValue={(e) => this.chanegCutInfo("height", e)}
+            />
+            <PropertyFields.Input
+              fieldName="宽度（像素）"
+              defaultValue={this.cutWidth}
+              fieldRules={[{ required: true, message: "请输入高度", trigger: "blur" }]}
+              onChangeValue={(e) => this.chanegCutInfo("width", e)}
+            />
           </div>
         )}
         <GuideTipProperty
@@ -117,7 +197,7 @@ export const UplaodImgFieldProperty = Vue.extendWithMixin({
           nText="否"
           activeValue={true}
           inActiveValue={false}
-          onChangeValue={(e) => this.changeFieldConfig("renderFormat", e ? "normal" : "none")}
+          onChangeValue={(e) => this.changeFieldConfig("renderFormat", e ? this.configField.renderFormat : "none")}
         />
         <PropertyFields.SwitchH defaultValue={this.configField.display} fieldName="是否默认在页面中展示" pText="是" nText="否" onChangeValue={(e) => this.changeFieldConfig("display", e)} />
       </div>

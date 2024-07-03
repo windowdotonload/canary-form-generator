@@ -29,7 +29,29 @@ export const CheckBoxH = Vue._$extend(
         this.formModel.checkBoxValue = e;
         this.formModel.value = e.join(",");
         this.$emit("changeValue", this.formModel.checkBoxValue);
+        this.handleDisabled();
         this.handleDisplay();
+      },
+      recrodClickCheckBoxItem(checkBoxItem) {
+        this.currentClickItem = checkBoxItem;
+      },
+      async handleDisabled() {
+        if (!this.disabledEditForm) return;
+        if (!this.__configField.optionsRule) return;
+        const rule = this.__configField.optionsRule;
+        const disabledValue = rule.split(":")[1];
+        const checkValue = this.currentClickItem.value;
+        if (!this.formModel.checkBoxValue.includes(checkValue)) return;
+        if (checkValue == disabledValue) {
+          this.formModel.checkBoxValue = [disabledValue];
+        } else {
+          const index = this.formModel.checkBoxValue.findIndex((item) => item == disabledValue);
+          if (index > -1) {
+            this.formModel.checkBoxValue.splice(index, 1);
+          }
+        }
+        this.formModel.value = this.formModel.checkBoxValue.join(",");
+        this.currentClickItem = null;
       },
       async handleDisplay() {
         await this.$nextTick();
@@ -70,7 +92,7 @@ export const CheckBoxH = Vue._$extend(
             <el-checkbox-group disabled={this.disabled} size="mini" value={this.formModel.checkBoxValue} onInput={this.checkBoxChange}>
               {this.checkBoxOptions.map((item, index) => {
                 return (
-                  <el-checkbox label={item.value} key={item.value}>
+                  <el-checkbox label={item.value} key={item.value} nativeOnClick={() => this.recrodClickCheckBoxItem(item)}>
                     {(item.label ? item.label : item.value) || `选项${index + 1}`}
                   </el-checkbox>
                 );
@@ -129,22 +151,34 @@ export const CheckBoxFieldProperty = Vue.extendWithMixin({
         item.label = item._uFieldInfo._configField.fieldName;
         item.children = [];
         item._uFieldInfo._configField.children.forEach((child) => {
-          child.value = child._uFieldInfo.__uuid;
-          child.label = child._uFieldInfo._configField.fieldName;
-          item.children.push(child);
-          // 处理Tab
-          if (child._uFieldInfo._configField.componentType == 10) {
+          if (![9].includes(child._uFieldInfo._configField.componentType)) {
+            child.value = child._uFieldInfo.__uuid;
+            child.label = child._uFieldInfo._configField.fieldName;
+            item.children.push(child);
+          }
+          // 处理Tab和组合添加按钮和只读字段
+          if ([8, 9, 10].includes(child._uFieldInfo._configField.componentType)) {
+            const childComponentType = child._uFieldInfo._configField.componentType;
             const children = child._uFieldInfo._configField.children;
             if (children && children.length) {
-              children.forEach((child) => {
-                const module = child.tabComponentModule;
-                const tabChildrenList = module._uFieldInfo._configField.children;
-                if (!tabChildrenList || !tabChildrenList.length) return;
-                tabChildrenList.forEach((field) => {
-                  field.value = field._uFieldInfo.__uuid;
-                  field.label = `${module._uFieldInfo._configField.fieldName}Tab - ` + field._uFieldInfo._configField.fieldName;
-                  item.children.push(field);
-                });
+              children.forEach((subChild) => {
+                if (subChild.tabComponentModule) {
+                  const module = subChild.tabComponentModule;
+                  const tabChildrenList = module._uFieldInfo._configField.children;
+                  if (!tabChildrenList || !tabChildrenList.length) return;
+                  tabChildrenList.forEach((field) => {
+                    field.value = field._uFieldInfo.__uuid;
+                    field.label = `${module._uFieldInfo._configField.fieldName}Tab - ` + field._uFieldInfo._configField.fieldName;
+                    item.children.push(field);
+                  });
+                } else {
+                  const labelPrefix = childComponentType == 9 ? "" : child._uFieldInfo._configField.fieldName + "-";
+                  const temp = {
+                    value: subChild._uFieldInfo.__uuid,
+                    label: labelPrefix + subChild._uFieldInfo._configField.fieldName,
+                  };
+                  item.children.push(temp);
+                }
               });
             }
           }
@@ -169,7 +203,7 @@ export const CheckBoxFieldProperty = Vue.extendWithMixin({
     revertDisableControlProperty() {
       const { _configField } = this.activeField;
       if (!_configField.optionsRule) return (this.disableControl = false);
-      this.disableControl = true;
+      this.disableControl = 1;
       const rule = _configField.optionsRule;
       const splitArr = rule.split(":");
       this.disabledValue = splitArr[1];
@@ -219,7 +253,12 @@ export const CheckBoxFieldProperty = Vue.extendWithMixin({
           onChangeValue={(e) => this.changeFieldConfig("fieldName", e)}
         />
         <PropertyFields.SwitchH defaultValue={this.configField.requireFlag} fieldName="是否必填" pText="是" nText="否" onChangeValue={(e) => this.changeFieldConfig("requireFlag", e)} />
-        <PropertyFields.SelectRelOptForDefault defaultOptions={this.configField.options} defaultSelValue={this.configField.defaultValue} onChangeValue={this.changeSelectOptFefaultvalue} />
+        <PropertyFields.SelectRelOptForDefault
+          maxOptionCount={10}
+          defaultOptions={this.configField.options}
+          defaultSelValue={this.configField.defaultValue}
+          onChangeValue={this.changeSelectOptFefaultvalue}
+        />
         <PropertyFields.SwitchH
           defaultValue={this.disableControl}
           fieldName="是否需要选中某个选项，其他选项无法选中"
@@ -236,7 +275,7 @@ export const CheckBoxFieldProperty = Vue.extendWithMixin({
           options1={this.configOptions}
           onChangeValue={this.changeControlValue}
         />
-        <PropertyFields.SwitchH defaultValue={this.fieldControl} fieldName="是否有选项，控制其他字段显影" pText="是" nText="否" onChangeValue={(e) => this.changeShowControl(e, "fieldControl")} />
+        <PropertyFields.SwitchH defaultValue={this.fieldControl} fieldName="是否有选项，控制其他字段显隐" pText="是" nText="否" onChangeValue={(e) => this.changeShowControl(e, "fieldControl")} />
         <PropertyFields.DisplayControl
           ref="fieldControlRef"
           show={this.fieldControl}
@@ -254,7 +293,7 @@ export const CheckBoxFieldProperty = Vue.extendWithMixin({
             tipOption: this.configField.tipOption,
           }}
         />
-        <PropertyFields.Input fieldName="Dollar符" maxlength={15} defaultValue={this.configField.documentPlace} onChangeValue={(e) => this.changeFieldConfig("display", e)} />
+        <PropertyFields.Input fieldName="Dollar符" maxlength={15} defaultValue={this.configField.documentPlace} onChangeValue={(e) => this.changeFieldConfig("documentPlace", e)} />
         <PropertyFields.SwitchH
           defaultValue={this.configField.renderFormat != "none" ? true : false}
           fieldName="是否在报告中展示"

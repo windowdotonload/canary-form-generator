@@ -21,7 +21,6 @@ export const RichText = Vue._$extend(
     },
     methods: {
       initDefaultValue() {
-        console.log("this.defaultValueinitDefaultValueinitDefaultValueRichText", this.defaultValue);
         this.formModel.value = this.defaultValue;
       },
       resetInputValue(val = "") {
@@ -43,7 +42,7 @@ export const RichText = Vue._$extend(
                 {this.__configField.tipOption && <GuideLubricationServiceTip tipOption={this.__configField.tipOption} />}
               </span>
             )}
-            <Editor onChangeValue={this.changeValue} defaultValue={this.defaultValue} />
+            <Editor key={this.placeholder} placeholder={this.placeholder} onChangeValue={this.changeValue} defaultValue={this.defaultValue} maxLength={this.maxlength} />
           </el-form-item>
         </el-form>
       );
@@ -53,7 +52,14 @@ export const RichText = Vue._$extend(
 );
 
 export const RichTextFieldProperty = Vue.extendWithMixin({
-  methods: {},
+  methods: {
+    changeLen(e) {
+      this.changeFieldConfig("lengthMax", e > 500 ? 500 : e);
+      if (e > 500) {
+        this.$refs.intpuLenProto.resetInputValue(500);
+      }
+    },
+  },
   render() {
     return (
       <div>
@@ -63,8 +69,8 @@ export const RichTextFieldProperty = Vue.extendWithMixin({
           onChangeValue={(e) => this.changeFieldConfig("fieldName", e)}
         />
         <PropertyFields.SwitchH defaultValue={this.configField.requireFlag} fieldName="是否必填" pText="是" nText="否" onChangeValue={(e) => this.changeFieldConfig("requireFlag", e)} />
-        <PropertyFields.Input defaultValue={this.configField.lengthMax} fieldName="输入字数上限" onChangeValue={(e) => this.changeFieldConfig("lengthMax", e)} />
-        <PropertyFields.Input defaultValue={this.configField.defaultValue} fieldName="默认值" onChangeValue={(e) => this.changeFieldConfig("defaultValue", e)} />
+        <PropertyFields.Input ref="intpuLenProto" defaultValue={this.configField.lengthMax} fieldName="输入字数上限" onChangeValue={(e) => this.changeLen(e)} />
+        <PropertyFields.Input defaultValue={this.configField.placeHolder} fieldName="文字提示" onChangeValue={(e) => this.changeFieldConfig("placeHolder", e)} />
         <GuideTipProperty
           activeField={this.activeField}
           defaultValue={{

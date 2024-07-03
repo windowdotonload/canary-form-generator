@@ -1,16 +1,16 @@
-import { useCommonMixin, useExtendConfig } from "../uitls/index";
+import { useCommonMixin, useExtendConfig, generateUniqueUUID } from "../uitls/index";
 import { deleteFormComponent } from "../../../api/api.js";
 import PropertyFields from "../material";
 import { css } from "@emotion/css";
 import { menuData } from "../iconMenu/config";
 import { EVENTBUS } from "../../formOperation.js";
-import cloneDeep from "lodash/cloneDeep";
+
 const excludeComponentType = [8, 10, 11];
 const groupItemOptions = menuData[0].subMenuData
   .filter((item) => !excludeComponentType.includes(item.componentType))
   .map((item) => {
     return {
-      ...cloneDeep(item),
+      ...JSON.parse(JSON.stringify(item)),
       label: item.name,
       value: item.componentType,
     };
@@ -40,6 +40,14 @@ export const GroupAddButton = Vue._$extend(
           });
         });
       },
+      handleFillFormDisplay(display, uuid /** uuid of find field */, indexOfButtonGroup) {
+        if (indexOfButtonGroup < 0) return;
+        const refKey = uuid + indexOfButtonGroup;
+        const compInstance = this.$refs[refKey] && this.$refs[refKey].getFieldComponentInstance();
+        console.log("compInstance", compInstance);
+        if (!compInstance) return;
+        compInstance.handleFillFormDisplay && compInstance.handleFillFormDisplay(display);
+      },
       initChildrenRenderList() {
         if (this.disabledEditForm) return;
         if (this.children && this.children.length) {
@@ -52,8 +60,10 @@ export const GroupAddButton = Vue._$extend(
         this.__configField.__groupList.forEach((item) => {
           const group = this.handleChildrenRenderList(item, false);
           if (!group) return;
+          group.id = generateUniqueUUID();
           this.groupList.push(group);
         });
+        EVENTBUS.$emit(this.__CtorUUID, { configProperty: "__group", value: this.groupList });
       },
       handleConfig(e) {
         const { configProperty, value } = e;
@@ -62,14 +72,20 @@ export const GroupAddButton = Vue._$extend(
         }
       },
       addGroup() {
+        if (this.groupList.length >= this.__configField.lengthMax) return ELEMENT.Message({ message: `最多添加${this.__configField.lengthMax}个组合`, type: "warning" });
         const group = this.handleChildrenRenderList(this.__configField.children, false);
         if (!group) return;
+        group.id = generateUniqueUUID();
         this.groupList.push(group);
+        EVENTBUS.$emit(this.__CtorUUID, { configProperty: "__group", value: this.groupList });
+      },
+      deleteGroup(index) {
+        this.groupList.splice(index, 1);
       },
       handleChildrenRenderList(list, emit = true) {
         const findCompConfigInfo = (compontType) => {
           const target = menuData[0].subMenuData.find((item) => item.componentType == compontType);
-          if (target) return cloneDeep(target);
+          if (target) return JSON.parse(JSON.stringify(target));
           return Object.create(null);
         };
         this.childrenRenderList = list
@@ -79,6 +95,10 @@ export const GroupAddButton = Vue._$extend(
             const compConfigInfo = findCompConfigInfo(findComponentType);
             if (child.configField) {
               compConfigInfo.configField = child.configField;
+            }
+            if (child.woComponentId) {
+              compConfigInfo.configField.woComponentId = child.woComponentId;
+              compConfigInfo.configField.woComponentUuid = child.woComponentUuid;
             }
             if (!compConfigInfo.configField.woParentUuid) {
               compConfigInfo.configField.woParentUuid = this.__CtorUUID;
@@ -103,13 +123,26 @@ export const GroupAddButton = Vue._$extend(
               this.groupList.map((group, index) => {
                 return (
                   <div
+                    key={group.id}
                     class={css`
                       margin: 10px 0;
                     `}
                   >
                     {group.map((Field) => {
-                      return <Field.Cotr _uFieldInfo={Field._uFieldInfo} disabledEditForm={true} ref={Field.__uuid + index} />;
+                      return (
+                        <Field.Cotr
+                          key={Field.__uuid}
+                          uuidOfButtonForBG={this.__configField.woComponentUuid}
+                          indexOfButtonGroup={index}
+                          _uFieldInfo={Field._uFieldInfo}
+                          disabledEditForm={true}
+                          ref={Field.__uuid + index}
+                        />
+                      );
                     })}
+                    <el-button size="mini" type="text" style="color:#d10000" onClick={() => this.deleteGroup(index)}>
+                      删除
+                    </el-button>
                   </div>
                 );
               })}
@@ -197,6 +230,11 @@ export const GroupAddButtonProperty = Vue.extendWithMixin({
       this.changeFieldConfig("options", this.groupItemList);
     },
     addGroupItemList() {
+      if (this.groupItemList.length >= 5)
+        return ELEMENT.Message({
+          message: `最多添加五个组合`,
+          type: "warning",
+        });
       this.groupItemList.push({
         value: "",
       });
@@ -246,7 +284,7 @@ export const GroupAddButtonProperty = Vue.extendWithMixin({
                   </span>
                   <el-select placeholder="请选择" size="mini" style={{ width: "70%", marginBottom: "10px" }} value={item.value} onChange={(e) => this.changeSelect(e, item)}>
                     {groupItemOptions.map((option) => {
-                      return <el-option label={option.label} value={option.value} disabled={this.selectedOptions.includes(option.value)} />;
+                      return <el-option label={option.label} value={option.value} />;
                     })}
                   </el-select>
                   <el-button

@@ -1,7 +1,6 @@
 import { useCommonMixin, useExtendConfig, checkFieldItemInPropertyPanel, useState } from "../uitls/index";
 import PropertyFields from "../material";
 import { GuideTipProperty, GuideNormalTip, GuideLubricationServiceTip } from "../systemComp/GuideTip";
-import { cloneDeep, mixin } from "lodash";
 
 export const Input = Vue._$extend(
   {
@@ -56,12 +55,10 @@ export const Input = Vue._$extend(
 export const InputFieldProperty = Vue.extendWithMixin({
   methods: {
     changeLen(e) {
-      this.changeFieldConfig("length", e > 500 ? 500 : e);
+      this.changeFieldConfig("lengthMax", e > 500 ? 500 : e);
       if (e > 500) {
         this.$refs.intpuLenProto.resetInputValue(500);
       }
-      this.$refs.defaultProto.resetInputValue("");
-      this.changeFieldConfig("defaultValue", "");
     },
   },
   render() {
@@ -74,7 +71,7 @@ export const InputFieldProperty = Vue.extendWithMixin({
         />
         <PropertyFields.SwitchH defaultValue={this.configField.requireFlag} fieldName="是否必填" pText="是" nText="否" onChangeValue={(e) => this.changeFieldConfig("requireFlag", e)} />
         <PropertyFields.Input defaultValue={this.configField.lengthMax} ref="intpuLenProto" fieldName="输入字数上限" onChangeValue={(e) => this.changeLen(e)} />
-        <PropertyFields.Input defaultValue={this.configField.defaultValue} ref="defaultProto" fieldName="默认值" onChangeValue={(e) => this.changeFieldConfig("defaultValue", e)} />
+        <PropertyFields.Input defaultValue={this.configField.placeHolder} ref="defaultProto" fieldName="文字提示" onChangeValue={(e) => this.changeFieldConfig("placeHolder", e)} />
         <GuideTipProperty
           activeField={this.activeField}
           defaultValue={{

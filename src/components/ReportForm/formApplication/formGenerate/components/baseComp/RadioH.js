@@ -78,15 +78,14 @@ export const TabBarProperty = Vue.extendWithMixin({
     };
   },
   created() {
-    console.log("--activeField--Tabbarpropery", cloneDeep(this.activeField));
     const { _configField } = this.activeField;
     if (_configField.children && _configField.children.length) {
-      this.options = cloneDeep(_configField.children);
+      this.options = _configField.children;
     }
   },
   methods: {
     getTabList(e) {
-      this.changeFieldConfig("children", cloneDeep(e));
+      this.changeFieldConfig("children", e);
     },
   },
   render() {

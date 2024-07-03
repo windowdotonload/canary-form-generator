@@ -48,19 +48,19 @@ export const TextImgTip = Vue._$extend(
           <el-form-item>
             <div
               class={css`
-                width: 100px;
-                height: 120px;
+                width: 100%;
+                height: fit-content;
                 box-sizing: border-box;
                 display: flex;
                 flex-wrap: wrap;
                 align-items: center;
               `}
             >
-              <span style="color:#606266">
-                文字提示
+              <div style="color:#606266;width:100%">
+                {this.fieldName}
                 {this.__configField.tipContent && <GuideNormalTip tipContent={this.__configField.tipContent} />}
                 {this.__configField.tipOption && <GuideLubricationServiceTip tipOption={this.__configField.tipOption} />}
-              </span>
+              </div>
               <UploadImg ref="textTipUploadImg" hideFieldName={true} defaultValue={this.imgUrl} limit={1} disabled={true} readOnly={this.disabledEditForm ? true : false} />
             </div>
           </el-form-item>
@@ -100,8 +100,6 @@ export const TextImgTipProperty = Vue.extendWithMixin({
           defaultValue={this.configField.fieldName}
         />
         <PropertyFields.UploadImg defaultValue={this.imgUrl} limit={1} fieldName="上传图片" onChangeValue={this.changeImg} />
-        <PropertyFields.SwitchH fieldName="是否必填" pText="是" nText="否" onChangeValue={(e) => this.changeFieldConfig("requireFlag", e)} defaultValue={this.configField.requireFlag} />
-        <PropertyFields.Input fieldName="Dollar符" maxlength={15} defaultValue={this.configField.documentPlace} onChangeValue={(e) => this.changeFieldConfig("documentPlace", e)} />
         <GuideTipProperty
           activeField={this.activeField}
           defaultValue={{

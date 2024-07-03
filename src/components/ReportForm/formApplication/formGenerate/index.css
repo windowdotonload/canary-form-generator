@@ -144,3 +144,10 @@
 .guide-dialog .el-dialog__body {
   padding: 20px;
 }
+.el-message-box__content {
+  overflow: auto;
+  max-height: 50vh;
+  padding: 10px 15px;
+  color: #606266;
+  font-size: 14px;
+}

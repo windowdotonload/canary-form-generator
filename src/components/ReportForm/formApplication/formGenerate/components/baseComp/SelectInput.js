@@ -103,7 +103,9 @@ export const SelectInput = Vue._$extend(
               <PropertyFields.Input
                 ref="INPUT"
                 style="width:40%"
+                maxlength={this.maxlength}
                 defaultValue={this.inputDefaultValue}
+                placeholder="请输入内容"
                 hideFieldName={true}
                 disabled={!this.disabledEditForm}
                 onChangeValue={(e) => this.changeValue("inputDefaultValue", e)}
@@ -167,11 +169,18 @@ export const SelectInputProperty = Vue.extendWithMixin({
       this.configField.children[0].options = options;
       this.configField.children[0].defaultValue = value;
       this.changeFieldConfig("__children", this.configField.children);
+      this.changeFieldConfig("defaultValue", value);
     },
     changeInputConfig(key, e) {
       this.configField.children[1][key] = e;
       this.configField.children[1][key] = e;
       this.changeFieldConfig("children", this.configField.children);
+    },
+    changeLen(e) {
+      this.changeFieldConfig("lengthMax", e > 500 ? 500 : e);
+      if (e > 500) {
+        this.$refs.intpuLenProto.resetInputValue(500);
+      }
     },
   },
   render() {
@@ -188,9 +197,10 @@ export const SelectInputProperty = Vue.extendWithMixin({
           defaultOptions={this.configField.children[0].options}
           defaultSelValue={this.configField.defaultValue}
           onChangeValue={this.changeSelectOptFefaultvalue}
+          maxOptionCount={10}
         />
-        <PropertyFields.Input fieldName="输入框输入字数上限" maxlength={15} defaultValue={this.configField.documentPlace} onChangeValue={(e) => this.changeInputConfig("lengthMax", e)} />
-        <PropertyFields.Input fieldName="输入框默认值" maxlength={15} defaultValue={this.configField.documentPlace} onChangeValue={(e) => this.changeInputConfig("defaultValue", e)} />
+        <PropertyFields.Input fieldName="输入框输入字数上限" maxlength={this.configField.lengthMax} defaultValue={this.configField.lengthMax} onChangeValue={(e) => this.changeLen(e)} />
+        <PropertyFields.Input fieldName="输入框默认值" maxlength={15} defaultValue={this.configField.children[1].defaultValue} onChangeValue={(e) => this.changeInputConfig("defaultValue", e)} />
         <GuideTipProperty
           activeField={this.activeField}
           defaultValue={{

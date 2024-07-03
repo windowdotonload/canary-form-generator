@@ -1,7 +1,6 @@
 import PropertyFields from "../material";
 import { EVENTBUS } from "../../formOperation.js";
 import { menuData } from "../iconMenu/config.js";
-import { cloneDeep } from "lodash";
 import { generateUniqueUUID } from "../uitls/index.js";
 export const configMixin = (rawOptions) => {
   return {
@@ -42,10 +41,9 @@ export const GroupModuleProperty = Vue.extendWithMixin({
     };
   },
   created() {
-    console.log("--activeField--GroupModulePropery", cloneDeep(this.activeField));
     const { _configField } = this.activeField;
     if (_configField.children && _configField.children.length) {
-      this.options = cloneDeep(_configField.children);
+      this.options = _configField.children;
     }
   },
   methods: {
@@ -58,7 +56,7 @@ export const GroupModuleProperty = Vue.extendWithMixin({
     },
     getComList(e) {
       console.log("eee", e);
-      this.changeFieldConfig("children", cloneDeep(e.selectOptions));
+      this.changeFieldConfig("children", e.selectOptions);
     },
   },
   render() {

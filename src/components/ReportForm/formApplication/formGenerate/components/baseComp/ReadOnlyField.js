@@ -1,9 +1,9 @@
-import { cloneDeep } from "lodash";
 import { useCommonMixin, useExtendConfig, generateUniqueUUID } from "../uitls/index";
 import { css } from "@emotion/css";
 import { EVENTBUS, formOperationState } from "../../formOperation.js";
 import { queryDevice, queryLubricationPointDetail, deleteFormComponent } from "../../../api/api.js";
 import PropertyFields from "../material";
+import OSSUploadCombine from "@/generalComponents/OSSUpload/index.vue";
 
 export const sourceOptions = {
   1: [
@@ -22,15 +22,21 @@ export const sourceOptions = {
     { value: "lubricationPointType", label: "润滑点设备类型" },
     { value: "lubricationMethodName", label: "润滑方式" },
     { value: "currentOilName", label: "在用油名称" },
-    { value: "oilBoxCapacityUnit", label: "油箱容量" },
-    { value: "lubricationPointPicPath", label: "润滑点图片" },
+    { value: "oilBoxCapacity", label: "油箱容量" },
+    { value: "lubricationPointPicRelativePath", label: "润滑点图片" },
     { value: "lubricationPointDesc", label: "润滑点描述" },
     { value: "recommendOilName", label: "设备制造商推荐油品" },
+    { value: "oilChangeMethod", label: "定期或按质换油" },
     { value: "lubricationPointManufacturer", label: "润滑点设备制造商名称" },
-    { value: "preMonthOilAddQuantityUnit", label: "每月润滑剂添加量" },
-    { value: "everyTimeOilAddQuantityUnit", label: "每次加油量" },
-    { value: "oilAddPeriod", label: "加油周期" },
-    { value: "lastOilAddDate", label: "上次加油日期" },
+    { value: "oilChangePeriod", label: "换油周期" },
+    { value: "lastOilChangeDate", label: "上次换油日期" },
+    { value: "preMonthOilAddQuantity", label: "每月润滑剂添加量" },
+    { value: "everyTimeOilAddQuantity-1", label: "每次加油量" },
+    { value: "oilAddPeriod-1", label: "加油周期" },
+    { value: "lastOilAddDate-1", label: "上次加油日期" },
+    { value: "everyTimeOilAddQuantity-2", label: "每次加脂量" },
+    { value: "oilAddPeriod-2", label: "加脂周期" },
+    { value: "lastOilAddDate-2", label: "上次加脂日期" },
   ],
 };
 export const sourceOptionsMap = {
@@ -69,6 +75,13 @@ export const ReadOnlyField = Vue._$extend(
         childrenRenderList: [],
         deviceInfo: {},
         lubInfo: {},
+        unitMap: {
+          M: "月",
+          D: "天",
+          Y: "年",
+          H: "小时",
+          KM: "公里",
+        },
       };
     },
     created() {
@@ -76,10 +89,18 @@ export const ReadOnlyField = Vue._$extend(
       this.getReqInfoDetail();
     },
     methods: {
+      handleFillFormDisplay(e, uuid) {
+        console.log("handleFillFormDisplay", e, uuid);
+      },
       async getReqInfoDetail() {
         if (!this.disabledEditForm) return;
         await this.getInfo();
-        console.log("this is getReqInfoDetail", this.deviceInfo, this.lubInfo);
+      },
+      async refreshStaticInfo() {
+        if (!this.disabledEditForm) return;
+        await this.getInfo();
+        this.childrenRenderList = this.childrenRenderList.map((item) => item);
+        this.$forceUpdate();
       },
       async getInfo() {
         const deviceRes = await queryDevice({
@@ -88,6 +109,7 @@ export const ReadOnlyField = Vue._$extend(
         const lubInfoRes = await queryLubricationPointDetail({
           lubricationPointNumber: this.$route.query.lubricationPointNumber,
         });
+
         if (deviceRes.data.code == 1000) {
           this.deviceInfo = deviceRes.data.data;
         }
@@ -114,10 +136,9 @@ export const ReadOnlyField = Vue._$extend(
         EVENTBUS.$emit(this.__CtorUUID, { configProperty: "children", value: this.handleEmitChildrenFormat(this.childrenRenderList) });
       },
       handleEmitChildrenFormat(list) {
-        list = cloneDeep(list);
         const handleList = list.map((child) => {
           if (child._uFieldInfo && child._uFieldInfo._configField) return child;
-          const copyObj = cloneDeep(child);
+          const copyObj = JSON.parse(JSON.stringify(child));
           const woComponentUuid = generateUniqueUUID(10);
           const res = {
             __uuid: woComponentUuid,
@@ -131,6 +152,9 @@ export const ReadOnlyField = Vue._$extend(
             componentType: 13,
             woParentUuid: this.__CtorUUID,
           };
+          if (res._uFieldInfo._configField.sourceField == "lubricationPointPicRelativePath") {
+            res._uFieldInfo._configField.componentType = 5;
+          }
           return res;
         });
         return handleList;
@@ -147,7 +171,7 @@ export const ReadOnlyField = Vue._$extend(
             }
             return child;
           });
-          this.childrenRenderList = cloneDeep(list);
+          this.childrenRenderList = list;
           this.syncChildrenToConfigField();
         }
       },
@@ -167,6 +191,33 @@ export const ReadOnlyField = Vue._$extend(
           this.syncChildrenToConfigField();
         }
       },
+      handleFieldDisplayRuleForLubType(displayRule) {
+        if (!this.disabledEditForm) return false;
+        if (!displayRule) return false;
+        const ruleArr = displayRule.split(":");
+        if (ruleArr[0] == "hideValue") {
+          const disableValue = ruleArr[1].split(",");
+          return disableValue.includes(this.lubInfo.lubricationMethodName);
+        }
+        return false;
+      },
+      handleLubFieldInfo(item) {
+        const basicKey = item.sourceField.split("-")[0];
+        const basicFieldInfo = this.lubInfo[basicKey] || "--";
+        if (["everyTimeOilAddQuantity", "oilBoxCapacity", "preMonthOilAddQuantity"].includes(basicKey)) {
+          const unitKey = basicKey + "Unit";
+          return basicFieldInfo + (this.lubInfo[unitKey] || "--");
+        }
+        if (item.sourceField == "oilChangeMethod") {
+          return basicFieldInfo == "--" ? basicFieldInfo : basicFieldInfo == 1 ? "定期" : "按质";
+        }
+
+        if (["oilChangePeriod", "oilChangePeriod", "oilChangePeriod", "oilAddPeriod"].includes(basicKey)) {
+          const unitKey = basicKey + "Unit";
+          return basicFieldInfo + (this.unitMap[this.lubInfo[unitKey]] || "--");
+        }
+        return basicFieldInfo;
+      },
     },
     render() {
       if (!this.display) return null;
@@ -185,6 +236,7 @@ export const ReadOnlyField = Vue._$extend(
               {this.childrenRenderList.map((item) => {
                 return (
                   <div
+                    key={item.sourceType == 1 ? this.deviceInfo[item.sourceField] : this.lubInfo[item.sourceField]}
                     class={css`
                       display: flex;
                       flex-wrap: wrap;
@@ -192,6 +244,7 @@ export const ReadOnlyField = Vue._$extend(
                       padding: 10px;
                       margin: 0;
                       width: 25%;
+                      display: ${this.handleFieldDisplayRuleForLubType(item.displayRule) ? "none" : ""};
                     `}
                   >
                     <section
@@ -205,9 +258,34 @@ export const ReadOnlyField = Vue._$extend(
                     <section
                       class={css`
                         width: 100%;
+                        // height: fit-content;
+                        // overflow: hidden;
+                        // text-overflow: ellipsis;
+                        // white-space: nowrap;
                       `}
                     >
-                      {this.disabledEditForm ? (item.sourceType == 1 ? this.deviceInfo[item.sourceField] || "--" : this.lubInfo[item.sourceField] || "--") : "--"}
+                      {this.disabledEditForm ? (
+                        item.sourceType == 1 ? (
+                          this.deviceInfo[item.sourceField] || "--"
+                        ) : item.sourceField == "lubricationPointPicRelativePath" ? (
+                          this.lubInfo[item.sourceField] ? (
+                            <OSSUploadCombine
+                              key={this.lubInfo[item.sourceField]}
+                              disabled={true}
+                              readOnly={true}
+                              limit={1}
+                              propFileList={[this.lubInfo[item.sourceField]]}
+                              onChangeFileList={this.setFile}
+                            />
+                          ) : (
+                            "暂无图片"
+                          )
+                        ) : (
+                          this.handleLubFieldInfo(item) || "--"
+                        )
+                      ) : (
+                        "--"
+                      )}
                     </section>
                   </div>
                 );
@@ -239,12 +317,27 @@ export const ReadOnlyFieldSingle = Vue.extend({
       default: "",
     },
   },
+  created() {
+    this.revertLubPointControl();
+  },
   data() {
     return {
+      LubPointControlValue: [],
       sourceType: this.singleFieldConfig.sourceType || 1,
     };
   },
   methods: {
+    revertLubPointControl() {
+      const displayRule = this.singleFieldConfig.displayRule;
+      if (displayRule) {
+        const ruleArr = displayRule.split(":");
+        if (ruleArr[0] == "hideValue") {
+          if (ruleArr[1] && ruleArr[1].length) {
+            this.LubPointControlValue = ruleArr[1].split(",");
+          }
+        }
+      }
+    },
     changeDataSoure(e) {
       this.sourceType = e;
       this.singleFieldConfig.sourceType = this.sourceType;
@@ -281,6 +374,10 @@ export const ReadOnlyFieldSingle = Vue.extend({
       }
       this.$emit("deleteField", this.singleFieldConfig.__id);
     },
+    changeLubPointControl(e) {
+      this.singleFieldConfig.displayRule = `hideValue:${e.join(",")}`;
+      this.$emit("changeValue", this.singleFieldConfig);
+    },
   },
   render() {
     return (
@@ -309,6 +406,22 @@ export const ReadOnlyFieldSingle = Vue.extend({
           onChangeValue={(e) => this.selectSourceData(e)}
           defaultValue={this.singleFieldConfig.sourceField}
         />
+        {this.singleFieldConfig.sourceType == 2 && (
+          <PropertyFields.DisplayControl
+            ref="lubPointControlRef"
+            fieldName="润滑方式的字段显隐控制"
+            show={1}
+            text1="当润滑方式为"
+            text2="报告页面不展示"
+            lubPointControlValue={this.LubPointControlValue}
+            controlList={this.displayRule}
+            options1={this.configOptions}
+            options2={this.contorlListOfFieldList}
+            onChangeValue={this.changeLubPointControl}
+            controlType="lubPointControl"
+          />
+        )}
+
         <PropertyFields.Input fieldName="Dollar符" maxlength={15} defaultValue={this.singleFieldConfig.documentPlace} onChangeValue={(e) => this.changeDocumentPlace(e)} />
         <el-button v-show={this.$parent.readonlyFieldConfigList.length > 1} size="mini" type="text" style="color:#d10000;margin-left:90%" onClick={this.deleteField}>
           删除

@@ -1,20 +1,18 @@
 <script>
-import cloneDeep from "lodash/cloneDeep";
 import { menuData } from "../formGenerate/components/iconMenu/config.js";
-import { getFormComponent, addRecordValue, getRecordValue, getFullUrl } from "../api/api.js";
+import { getFormComponent, addRecordValue, getRecordValue, getRecordPath, getGuideListReq, clearGuideList } from "../api/api.js";
 import * as FORM from "../formGenerate/formOperation.js";
 import Skeleton from "./components/skeleton";
 import { css, cx } from "@emotion/css";
 import flattenDeep from "lodash/flattenDeep";
+import FillDialog from "./components/fillDialog.vue";
 const { ref, reactive, onMounted, onUnmounted } = VueCompositionAPI;
 
 let __vm = null;
-
 export default {
   components: {
     Skeleton,
   },
-
   data() {
     return {
       renderDone: true,
@@ -23,20 +21,54 @@ export default {
       revertFormValueMapRecord: new Map(),
       moduleList: [],
       activeTab: "",
+      finishAllWorkorder: false,
+      observer: null,
     };
   },
   provide() {
     return {
       createFormField: this.createFormField,
       formContentList: FORM.formOperationState.formContentList,
+      saveForm: this.saveForm,
     };
   },
   async created() {
     this.initVM();
+    getGuideListReq();
     await this.getRecordValue();
     await this.revertFormComponentList();
   },
+
+  beforeDestroy() {
+    clearGuideList();
+  },
   methods: {
+    async createIntersectionObserver() {
+      await this.$nextTick();
+      this.observer = new IntersectionObserver(
+        (entries) => {
+          const isIntersecting = entries[0].isIntersecting;
+          const target = entries[0].target;
+          if (isIntersecting) {
+            const fieldName = target.getAttribute("data-module-name");
+            const woComponentId = this.moduleList.find((item) => item.configField.fieldName == fieldName).configField.woComponentId;
+            if (woComponentId) {
+              this.activeTab = woComponentId;
+            }
+          }
+        },
+        {
+          root: this.$refs.formFillContainer,
+          rootMargin: "0px",
+          threshold: 0.4,
+        }
+      );
+
+      Object.keys(this.$refs).forEach((key) => {
+        if (!this.$refs[key].$el) return;
+        this.observer.observe(this.$refs[key].$el);
+      });
+    },
     initVM() {
       __vm = this;
     },
@@ -51,7 +83,7 @@ export default {
     findBaseCompInfo(componentType) {
       const baseCompInfo = menuData[0].subMenuData.find((item) => item.componentType === componentType);
       if (baseCompInfo) {
-        return cloneDeep(baseCompInfo);
+        return JSON.parse(JSON.stringify(baseCompInfo));
       }
       return null;
     },
@@ -60,7 +92,7 @@ export default {
       if (!compInfoList.length) return;
       return compInfoList.map((compInfo) => {
         const configInfo = this.findBaseCompInfo(compInfo.woComponentType);
-        const baseCompInfo = configInfo ? configInfo : cloneDeep(compInfo);
+        const baseCompInfo = configInfo ? configInfo : JSON.parse(JSON.stringify(compInfo));
         baseCompInfo.configField = compInfo;
         baseCompInfo.configField.options = compInfo.options ? JSON.parse(compInfo.options) : baseCompInfo.options;
         baseCompInfo.configField.componentType = compInfo.woComponentType;
@@ -117,19 +149,22 @@ export default {
         });
         const woFormCompList = res.data.data;
         const handleWoFormCompList = this.handeBackendData(woFormCompList);
+        console.log("this is handleWoFormCompList", handleWoFormCompList);
         if (handleWoFormCompList && handleWoFormCompList.length > 0) {
           handleWoFormCompList.forEach((compInfo) => {
             this.createFormField(compInfo);
           });
         }
         this.moduleList = handleWoFormCompList.filter((item) => {
-          return item.componentType == 11;
+          return item.componentType == 11 && item.configField.display;
         });
+        if (!this.moduleList.length) return;
         this.activeTab = this.moduleList[0].configField.woComponentId;
         this.renderDone = true;
+        this.createIntersectionObserver();
       }
     },
-    async saveFormValue() {
+    async saveForm(operate /** operate 0-保存草稿，1-保存并发布报告，2-保存并发布工单，3-保存并发布申请单 */, tip = true) {
       const handleRevertWoValueId = (res) => {
         if (!res.woComponentId) return res;
         const woComponentId = res.woComponentId;
@@ -182,15 +217,29 @@ export default {
         .map((field) => {
           return handleRcordValueFormat(field);
         });
-      const res = await addRecordValue(handleValueList);
+
+      const res = await addRecordValue({
+        operate,
+        woFormValueRequestList: handleValueList,
+      });
+      if (res.data.code == 1000) {
+        if (tip) this.$message.success("保存成功");
+        if (operate != 0) this.$router.go(-1);
+      }
+      this.closeDialog();
     },
     async previewReport() {
-      const path = this.$route.query.path;
-      if (!path) return;
-      const fullUrl = await getFullUrl({
-        url: path,
+      const res = await getRecordPath({
+        woRecordId: this.$route.query.woRecordId,
       });
-      window.open(fullUrl, "_blank");
+      if (res.data.code == 1000) {
+        const fullpath = await await this.requestMethodGetTip("/web/file/getFullUrl", {
+          url: res.data.data,
+        });
+        window.open(fullpath.data.data, "_blank");
+      } else {
+        this.$message.warning(res.data.msg);
+      }
     },
     clickTabpane(e) {
       const activeTabPanelConfigField = this.moduleList[e.index].configField;
@@ -200,7 +249,22 @@ export default {
       activeTabPanelDOM.scrollIntoView();
     },
     cancelFillForm() {
-      this.$router.go(-1);
+      this.$confirm("取消后将丢失本次编辑内容", "取消编辑", {
+        confirmButtonText: "确定",
+        cancelButtonText: "继续编辑",
+        type: "warning",
+      })
+        .then(() => {
+          this.$router.go(-1);
+        })
+        .catch(() => {});
+    },
+    async saveFormAndPublic() {
+      await this.$nextTick();
+      this.finishAllWorkorder = true;
+    },
+    closeDialog() {
+      this.finishAllWorkorder = false;
     },
   },
   setup() {
@@ -237,6 +301,7 @@ export default {
           })}
         </el-tabs>
         <div
+          ref="formFillContainer"
           class={css`
             box-sizing: border-box;
             padding: 0 5px;
@@ -254,7 +319,7 @@ export default {
             ) : (
               <transition-group name="form-property-box-content-list">
                 {FORM.formOperationState.formContentList.map((Field) => (
-                  <Field.Cotr _uFieldInfo={Field._uFieldInfo} key={Field.__uuid} disabledEditForm={true} ref={Field.__uuid} />
+                  <Field.Cotr data-module-name={Field._uFieldInfo._configField.fieldName} _uFieldInfo={Field._uFieldInfo} key={Field.__uuid} disabledEditForm={true} ref={Field.__uuid} />
                 ))}
               </transition-group>
             )}
@@ -277,16 +342,18 @@ export default {
           <el-button size="mini" onClick={this.previewReport}>
             预览报告
           </el-button>
-          <el-button size="mini" onClick={this.saveFormValue}>
+          <el-button size="mini" onClick={() => this.saveForm(0)}>
             保存草稿
           </el-button>
-          <el-button type="danger" size="mini" onClick={this.saveFormValue}>
+          <el-button type="danger" size="mini" onClick={() => this.saveFormAndPublic(1)}>
             保存并发布
           </el-button>
           <el-button size="mini" onClick={this.cancelFillForm}>
             取消
           </el-button>
         </div>
+
+        <FillDialog finishAllWorkorder={this.finishAllWorkorder} />
       </div>
     );
   },

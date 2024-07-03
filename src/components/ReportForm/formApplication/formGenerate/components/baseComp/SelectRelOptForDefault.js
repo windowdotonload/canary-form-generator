@@ -50,7 +50,7 @@ export const SelectRelOptForDefault = Vue._$extend(
     render() {
       return (
         <div>
-          <SelectOptions fieldName="选项" onGetOptions={this.getOptions} options={this.options} />
+          <SelectOptions fieldName="选项" maxOptionCount={this.maxOptionCount} onGetOptions={this.getOptions} options={this.options} />
           <SelectH
             ref="select_h"
             fieldName={this.selectHFieldName}
@@ -69,6 +69,10 @@ export const SelectRelOptForDefault = Vue._$extend(
       selectHFieldName: { type: String, default: "默认值" },
       defaultOptions: { type: Array, default: null },
       defaultSelValue: { type: String, default: "" },
+      maxOptionCount: {
+        type: Number,
+        default: 100,
+      },
       multiDefault: {
         type: Boolean,
         default: false,
